@@ -39,7 +39,8 @@
     "lint": "eslint src --ext .ts --fix",
     "type-check": "tsc --noEmit",
     "install:web": "cd src/web && pnpm install",
-    "prepublishOnly": "pnpm run clean && pnpm run build"
+    "prepublishOnly": "pnpm run clean && pnpm run build",
+    "lint:fix": "eslint . --fix"
   },
   "keywords": [
     "ldesign",
@@ -76,12 +77,13 @@
     "@types/uuid": "^9.0.7",
     "@types/ws": "^8.5.10",
     "concurrently": "^9.2.1",
-    "eslint": "^8.0.0",
+    "eslint": "^9.18.0",
     "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
     "tsx": "^4.20.5",
-    "typescript": "^5.0.0",
-    "vitest": "^1.0.0"
+    "typescript": "^5.7.3",
+    "vitest": "^1.0.0",
+    "@antfu/eslint-config": "^6.0.0"
   },
   "peerDependencies": {
     "vue": "^3.3.0"
