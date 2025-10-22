@@ -77,11 +77,13 @@ export function formatPortInfo(port: number, host: string = 'localhost'): {
   host: string
   url: string
   localUrl: string
+  networkUrl?: string
 } {
   return {
     port,
     host,
     url: `http://${host}:${port}`,
-    localUrl: `http://localhost:${port}`
+    localUrl: `http://localhost:${port}`,
+    networkUrl: host !== 'localhost' ? `http://${host}:${port}` : undefined
   }
 }

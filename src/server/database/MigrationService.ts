@@ -5,6 +5,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
+import { randomUUID as uuidv4 } from 'crypto'
 import { DatabaseManager } from './DatabaseManager'
 
 export class MigrationService {

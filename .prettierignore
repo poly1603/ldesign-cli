@@ -1,0 +1,16 @@
+node_modules
+dist
+.ldesign-cache
+data
+*.log
+*.lock
+pnpm-lock.yaml
+package-lock.json
+*.min.js
+*.min.css
+coverage
+.git
+.vscode
+.idea
+
+

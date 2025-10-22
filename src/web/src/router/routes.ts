@@ -95,6 +95,30 @@ export const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/templates',
+    name: 'TemplateMarket',
+    component: () => import('../views/TemplateMarket.vue'),
+    meta: {
+      title: '模板市场'
+    }
+  },
+  {
+    path: '/security',
+    name: 'SecurityReport',
+    component: () => import('../views/SecurityReport.vue'),
+    meta: {
+      title: '安全报告'
+    }
+  },
+  {
+    path: '/monitor',
+    name: 'MonitorDashboard',
+    component: () => import('../views/MonitorDashboard.vue'),
+    meta: {
+      title: '性能监控'
+    }
+  },
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('../views/Settings.vue'),

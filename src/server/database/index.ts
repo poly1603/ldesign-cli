@@ -17,6 +17,8 @@ import { getDatabaseManager } from './DatabaseManager'
 import { MigrationService } from './MigrationService'
 import { ProjectRepository } from './repositories/ProjectRepository'
 import { NpmSourceRepository } from './repositories/NpmSourceRepository'
+import { seedTemplates } from './seed-templates.js'
+import { getAllTemplates } from './templates.js'
 import * as path from 'path'
 
 /**
@@ -34,7 +36,7 @@ export async function initializeDatabase(options?: {
   migrationResult?: any
 }> {
   try {
-    
+
 
     // 1. 获取数据库管理器实例
     const dbManager = getDatabaseManager({
@@ -48,28 +50,28 @@ export async function initializeDatabase(options?: {
     // 3. 检查是否需要数据迁移
     const dataDir = options?.dataDir || path.join(process.cwd(), 'data')
     const migrationService = new MigrationService(dbManager, dataDir)
-    
+
     let migrationResult
     if (options?.autoMigrate !== false && migrationService.needsMigration()) {
-      
-      
+
+
       // 备份现有数据文件
       await migrationService.backupDataFiles()
-      
+
       // 执行数据迁移
       migrationResult = await migrationService.migrate()
-      
+
       if (migrationResult.success) {
-        
-        
-        
-        
-        
+
+
+
+
+
       } else {
         console.warn('[Database] 数据迁移部分失败:', migrationResult.errors)
       }
     } else {
-      
+
     }
 
     // 4. 验证数据库完整性
@@ -80,11 +82,16 @@ export async function initializeDatabase(options?: {
 
     // 5. 获取数据库统计信息
     const stats = dbManager.getStats()
-    
-    .toFixed(2)} MB`)
+    console.log(`[Database] 数据库大小: ${(stats.size / 1024 / 1024).toFixed(2)} MB`)
     
     for (const table of stats.tables) {
-      
+      console.log(`[Database] 表 ${table.name}: ${table.rowCount} 条记录`)
+    }
+
+    // 6. 种子化模板数据（如果模板表为空）
+    const templates = getAllTemplates()
+    if (templates.length === 0) {
+      await seedTemplates()
     }
 
     
@@ -98,7 +105,7 @@ export async function initializeDatabase(options?: {
     console.error('[Database] 数据库初始化失败:', error)
     return {
       success: false,
-      message: `数据库初始化失败: ${error}`,
+      message: `数据库初始化失败: ${ error } `,
     }
   }
 }

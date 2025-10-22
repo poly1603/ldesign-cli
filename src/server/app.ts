@@ -15,8 +15,15 @@ import { apiRouter } from './routes/api.js'
 import { fnmRouter } from './routes/fnm.js'
 import { voltaRouter } from './routes/volta.js'
 import { npmSourcesRouter } from './routes/npm-sources.js'
+import { templatesRouter } from './routes/templates.js'
+import { securityRouter } from './routes/security.js'
+import { gitRouter } from './routes/git.js'
+import { monitorRouter } from './routes/monitor.js'
+import { pluginsRouter } from './routes/plugins.js'
+import { syncRouter } from './routes/sync.js'
 import { setupWebSocket, connectionManager } from './websocket.js'
 import { initializeDatabase, closeDatabase } from './database/index.js'
+import { monitorService } from './services/monitor-service.js'
 
 // 获取当前文件的目录路径，兼容 ESM 和 CJS
 let __dirname: string
@@ -50,12 +57,12 @@ export async function createServer(options: ServerOptions) {
       verbose: debug,
       autoMigrate: true,
     })
-    
+
     if (!dbResult.success) {
       serverLogger.error('数据库初始化失败:', dbResult.message)
       throw new Error(dbResult.message)
     }
-    
+
     serverLogger.info('✅ 数据库初始化成功')
   } catch (error) {
     serverLogger.error('数据库初始化错误:', error)
@@ -87,6 +94,12 @@ export async function createServer(options: ServerOptions) {
   app.use('/api/fnm', fnmRouter)
   app.use('/api/volta', voltaRouter)
   app.use('/api/npm-sources', npmSourcesRouter)
+  app.use('/api/templates', templatesRouter)
+  app.use('/api/security', securityRouter)
+  app.use('/api/git', gitRouter)
+  app.use('/api/monitor', monitorRouter)
+  app.use('/api/plugins', pluginsRouter)
+  app.use('/api/sync', syncRouter)
 
   // 静态文件服务
   // 尝试多个可能的路径，优先使用构建后的文件
@@ -150,6 +163,9 @@ export async function createServer(options: ServerOptions) {
   // 设置 WebSocket
   const wss = new WebSocketServer({ server })
   setupWebSocket(wss, debug)
+
+  // 启动性能监控
+  monitorService.startMonitoring(5000) // 每5秒采集一次指标
 
   // 监听进程退出信号
   const handleShutdown = (signal: string) => {

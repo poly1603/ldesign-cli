@@ -41,7 +41,7 @@ export class DatabaseManager {
   private getDefaultDbPath(): string {
     // 使用项目根目录下的 data 目录
     const dbDir = path.join(process.cwd(), 'data')
-    
+
     // 确保目录存在
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true })
@@ -55,7 +55,7 @@ export class DatabaseManager {
    */
   public async initialize(): Promise<void> {
     try {
-      
+
 
       // 初始化 sql.js
       this.SQL = await initSqlJs()
@@ -71,13 +71,19 @@ export class DatabaseManager {
       // 创建或打开数据库
       this.db = new this.SQL.Database(buffer)
 
-      // 启用外键约束
-      this.exec('PRAGMA foreign_keys = ON')
+      // 性能优化配置
+      this.exec('PRAGMA foreign_keys = ON')                    // 启用外键约束
+      this.exec('PRAGMA journal_mode = WAL')                   // WAL 模式，支持并发读写
+      this.exec('PRAGMA synchronous = NORMAL')                 // 平衡性能和安全性
+      this.exec('PRAGMA temp_store = MEMORY')                  // 临时表存储在内存
+      this.exec('PRAGMA mmap_size = 30000000000')             // 使用内存映射 I/O
+      this.exec('PRAGMA page_size = 4096')                     // 优化页面大小
+      this.exec('PRAGMA cache_size = -2000')                   // 2MB 缓存大小
 
       // 创建表结构
       await this.createTables()
 
-      
+
     } catch (error) {
       console.error('[DatabaseManager] 数据库初始化失败:', error)
       throw error
@@ -207,6 +213,28 @@ export class DatabaseManager {
       )
     `)
 
+    // 项目模板表
+    this.exec(`
+      CREATE TABLE IF NOT EXISTS project_templates (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        category TEXT NOT NULL,
+        tags TEXT,
+        git_url TEXT,
+        local_path TEXT,
+        version TEXT,
+        author TEXT,
+        icon TEXT,
+        variables TEXT,
+        is_official INTEGER DEFAULT 0,
+        download_count INTEGER DEFAULT 0,
+        star_count INTEGER DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `)
+
     // 创建索引以提高查询性能
     this.exec(`
       CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at DESC);
@@ -214,9 +242,11 @@ export class DatabaseManager {
       CREATE INDEX IF NOT EXISTS idx_ai_conversations_updated_at ON ai_conversations(updated_at DESC);
       CREATE INDEX IF NOT EXISTS idx_ai_messages_conversation_id ON ai_messages(conversation_id);
       CREATE INDEX IF NOT EXISTS idx_ai_messages_created_at ON ai_messages(created_at);
+      CREATE INDEX IF NOT EXISTS idx_templates_category ON project_templates(category);
+      CREATE INDEX IF NOT EXISTS idx_templates_created_at ON project_templates(created_at DESC);
     `)
 
-    
+
   }
 
   /**
@@ -226,9 +256,9 @@ export class DatabaseManager {
     if (!this.db) {
       throw new Error('数据库未初始化，请先调用 initialize()')
     }
-    
+
     const self = this
-    
+
     // 返回一个包装对象，提供 better-sqlite3 风格的 API
     return {
       prepare(sql: string) {
@@ -295,7 +325,7 @@ export class DatabaseManager {
       this.save()
       this.db.close()
       this.db = null
-      
+
     }
   }
 
@@ -306,7 +336,7 @@ export class DatabaseManager {
     if (!this.db) {
       throw new Error('数据库未初始化')
     }
-    
+
     try {
       this.exec('BEGIN TRANSACTION')
       const result = fn()
@@ -329,13 +359,13 @@ export class DatabaseManager {
     }
 
     const targetPath = backupPath || `${this.dbPath}.backup-${Date.now()}`
-    
+
     try {
       // 先保存当前数据
       this.save()
       // 复制文件
       fs.copyFileSync(this.dbPath, targetPath)
-      
+
       return targetPath
     } catch (error) {
       throw error
@@ -353,7 +383,7 @@ export class DatabaseManager {
     this.exec('PRAGMA optimize')
     this.exec('VACUUM')
     this.save()
-    
+
   }
 
   /**
@@ -376,7 +406,7 @@ export class DatabaseManager {
     // 获取页数和页大小
     const pageCountResult = this.db.exec('PRAGMA page_count')
     const pageSizeResult = this.db.exec('PRAGMA page_size')
-    
+
     const pageCount = pageCountResult[0]?.values[0]?.[0] as number || 0
     const pageSize = pageSizeResult[0]?.values[0]?.[0] as number || 0
 

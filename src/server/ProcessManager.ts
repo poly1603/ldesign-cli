@@ -38,6 +38,8 @@ export interface ProcessInfo {
 export class ProcessManager extends EventEmitter {
   private static instance: ProcessManager
   private processes: Map<string, ProcessInfo> = new Map()
+  private readonly maxProcesses: number = 50 // 最大进程数
+  private readonly maxLogsPerProcess: number = 1000 // 每个进程最大日志数
 
   private constructor() {
     super()
@@ -116,11 +118,11 @@ export class ProcessManager extends EventEmitter {
       // --no-git-checks: 跳过 git 检查
       // --ignore-scripts: 跳过 prepublishOnly 等生命周期脚本，适用于私有源快速发布
       args = ['publish', '--no-git-checks', '--ignore-scripts']
-      
+
       // 如果 environment 是 URL，则作为 registry 参数
       if (environment && (environment.startsWith('http://') || environment.startsWith('https://'))) {
         args.push('--registry', environment)
-        
+
         // 对于 Verdaccio 本地源，检查认证状态
         if (environment.includes('127.0.0.1') || environment.includes('localhost')) {
           if (!this.checkVerdaccioAuth(environment)) {
@@ -180,7 +182,7 @@ export class ProcessManager extends EventEmitter {
     // 监听标准输出
     child.stdout?.on('data', (data: Buffer) => {
       const message = data.toString()
-      processInfo.logs.push({
+      this.addLog(processInfo, {
         time: Date.now(),
         message,
         type: 'stdout'
@@ -191,7 +193,7 @@ export class ProcessManager extends EventEmitter {
     // 监听错误输出
     child.stderr?.on('data', (data: Buffer) => {
       const message = data.toString()
-      processInfo.logs.push({
+      this.addLog(processInfo, {
         time: Date.now(),
         message,
         type: 'stderr'
@@ -301,10 +303,35 @@ export class ProcessManager extends EventEmitter {
    */
   public async stopAllProcesses(): Promise<void> {
     const promises = Array.from(this.processes.keys()).map((id) =>
-      this.stopProcess(id).catch(() => {})
+      this.stopProcess(id).catch(() => { })
     )
     await Promise.all(promises)
     this.processes.clear()
+  }
+
+  /**
+   * 添加日志（带限制）
+   */
+  private addLog(
+    processInfo: ProcessInfo,
+    log: { time: number; message: string; type: 'stdout' | 'stderr' }
+  ): void {
+    processInfo.logs.push(log)
+
+    // 如果超过最大日志数，删除最旧的
+    if (processInfo.logs.length > this.maxLogsPerProcess) {
+      processInfo.logs.shift()
+    }
+  }
+
+  /**
+   * 清除进程日志
+   */
+  public clearProcessLogs(processId: string): void {
+    const processInfo = this.processes.get(processId)
+    if (processInfo) {
+      processInfo.logs = []
+    }
   }
 
   /**
@@ -326,6 +353,49 @@ export class ProcessManager extends EventEmitter {
       return logs.slice(-limit)
     }
     return logs
+  }
+
+  /**
+   * 检查并限制进程数量
+   */
+  private checkProcessLimit(): void {
+    if (this.processes.size >= this.maxProcesses) {
+      // 找到最老的已停止进程并删除
+      let oldestId: string | null = null
+      let oldestTime = Date.now()
+
+      this.processes.forEach((info, id) => {
+        if (info.status !== 'running' && info.startTime < oldestTime) {
+          oldestTime = info.startTime
+          oldestId = id
+        }
+      })
+
+      if (oldestId) {
+        this.processes.delete(oldestId)
+      }
+    }
+  }
+
+  /**
+   * 获取内存使用统计
+   */
+  public getMemoryStats(): {
+    processCount: number
+    totalLogs: number
+    avgLogsPerProcess: number
+  } {
+    let totalLogs = 0
+
+    this.processes.forEach(info => {
+      totalLogs += info.logs.length
+    })
+
+    return {
+      processCount: this.processes.size,
+      totalLogs,
+      avgLogsPerProcess: this.processes.size > 0 ? Math.round(totalLogs / this.processes.size) : 0
+    }
   }
 }
 

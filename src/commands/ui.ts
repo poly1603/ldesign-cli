@@ -83,9 +83,12 @@ export async function uiCommand(options: UICommandOptions = {}): Promise<void> {
 
     // 显示启动信息
     uiLogger.success('LDesign UI 管理界面已启动')
-            if (host !== 'localhost') {
-          }
-            
+    uiLogger.info(`本地访问: ${portInfo.localUrl}`)
+
+    if (host !== 'localhost' && portInfo.networkUrl) {
+      uiLogger.info(`网络访问: ${portInfo.networkUrl}`)
+    }
+
     // 自动打开浏览器
     if (shouldOpen) {
       try {

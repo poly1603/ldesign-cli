@@ -22,13 +22,22 @@ export interface WSMessage {
  */
 class ConnectionManager {
   private connections = new Set<WebSocket>()
+  private readonly maxConnections: number = 100 // 最大连接数
 
   /**
    * 添加连接
    */
-  addConnection(ws: WebSocket): void {
+  addConnection(ws: WebSocket): boolean {
+    // 检查连接数限制
+    if (this.connections.size >= this.maxConnections) {
+      wsLogger.warn(`连接数已达上限 (${this.maxConnections})，拒绝新连接`)
+      ws.close(1008, '服务器连接数已满')
+      return false
+    }
+
     this.connections.add(ws)
     wsLogger.debug(`新连接已建立，当前连接数: ${this.connections.size}`)
+    return true
   }
 
   /**
@@ -85,6 +94,41 @@ class ConnectionManager {
   getConnectionCount(): number {
     return this.connections.size
   }
+
+  /**
+   * 清理无效连接
+   */
+  cleanupStaleConnections(): number {
+    let cleaned = 0
+
+    this.connections.forEach(ws => {
+      if (ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+        this.connections.delete(ws)
+        cleaned++
+      }
+    })
+
+    if (cleaned > 0) {
+      wsLogger.debug(`已清理 ${cleaned} 个无效连接`)
+    }
+
+    return cleaned
+  }
+
+  /**
+   * 关闭所有连接
+   */
+  closeAll(): void {
+    wsLogger.info(`关闭所有连接，共 ${this.connections.size} 个`)
+
+    this.connections.forEach(ws => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close(1001, '服务器关闭')
+      }
+    })
+
+    this.connections.clear()
+  }
 }
 
 const connectionManager = new ConnectionManager()
@@ -93,11 +137,23 @@ const connectionManager = new ConnectionManager()
  * 设置 WebSocket 服务器
  */
 export function setupWebSocket(wss: WebSocketServer, debug: boolean = false): void {
+  // 定期清理无效连接
+  const cleanupInterval = setInterval(() => {
+    connectionManager.cleanupStaleConnections()
+  }, 60000) // 每分钟清理一次
+
+  cleanupInterval.unref() // 防止阻止进程退出
+
   wss.on('connection', (ws, request) => {
     wsLogger.info(`WebSocket 连接建立: ${request.socket.remoteAddress}`)
-    
+
     // 添加到连接管理器
-    connectionManager.addConnection(ws)
+    const added = connectionManager.addConnection(ws)
+
+    if (!added) {
+      // 连接数已满，直接返回
+      return
+    }
 
     // 发送欢迎消息
     connectionManager.sendToConnection(ws, {
@@ -193,7 +249,7 @@ function handleMessage(ws: WebSocket, message: WSMessage, debug: boolean): void 
 function handleSubscribe(ws: WebSocket, data: any): void {
   const { event } = data
   wsLogger.debug(`客户端订阅事件: ${event}`)
-  
+
   connectionManager.sendToConnection(ws, {
     type: 'subscribed',
     data: { event, message: `已订阅事件: ${event}` }
@@ -206,7 +262,7 @@ function handleSubscribe(ws: WebSocket, data: any): void {
 function handleUnsubscribe(ws: WebSocket, data: any): void {
   const { event } = data
   wsLogger.debug(`客户端取消订阅事件: ${event}`)
-  
+
   connectionManager.sendToConnection(ws, {
     type: 'unsubscribed',
     data: { event, message: `已取消订阅事件: ${event}` }

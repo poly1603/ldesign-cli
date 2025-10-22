@@ -64,7 +64,6 @@ app.config.warnHandler = (msg, instance, trace) => {
  * 清除所有进程状态
  */
 function clearAllProcessStates() {
-  
   // 获取所有 localStorage 的键
   const keys = Object.keys(localStorage)
 
@@ -72,10 +71,11 @@ function clearAllProcessStates() {
   keys.forEach(key => {
     if (key.startsWith('process-')) {
       localStorage.removeItem(key)
-          }
+    }
   })
 
-  }
+  console.log('已清除所有进程状态')
+}
 
 /**
  * 应用初始化
@@ -88,13 +88,15 @@ async function initApp() {
     // 监听服务器关闭事件
     const { subscribe } = useWebSocket()
     subscribe('server-shutdown', (data) => {
-            clearAllProcessStates()
+      console.log('收到服务器关闭通知:', data)
+      clearAllProcessStates()
     })
 
     // 挂载应用
     app.mount('#app')
 
-      } catch (error) {
+    console.log('✅ 应用启动成功')
+  } catch (error) {
     console.error('❌ 应用启动失败:', error)
 
     // 显示错误信息
