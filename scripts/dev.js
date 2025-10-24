@@ -1,84 +1,48 @@
-#!/usr/bin/env node
-
 /**
- * 开发脚本
- * 用于启动开发环境
+ * 开发模式启动脚本
+ * 串行启动后端和前端开发服务器，确保后端就绪后再启动前端
  */
 
 import { spawn } from 'child_process'
-import { resolve, dirname } from 'path'
-import { fileURLToPath } from 'url'
-import { existsSync } from 'fs'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const projectRoot = resolve(__dirname, '..')
-const webDir = resolve(projectRoot, 'src/web')
-
-console.log('🚀 启动 LDesign CLI 开发环境...')
-console.log(`📁 项目根目录: ${projectRoot}`)
-console.log(`🌐 Web 目录: ${webDir}`)
+import chalk from 'chalk'
+import http from 'http'
 
 /**
- * 启动前端开发服务器
+ * 等待端口可用
  */
-function startWebDev() {
+function waitForPort(port, timeout = 30000) {
   return new Promise((resolve, reject) => {
-    console.log('\n📦 启动前端开发服务器...')
-    
-    if (!existsSync(resolve(webDir, 'package.json'))) {
-      console.log('⚠️  前端 package.json 不存在，跳过前端开发服务器')
-      resolve(null)
-      return
+    const startTime = Date.now()
+    const interval = 500
+
+    const check = () => {
+      const req = http.get(`http://127.0.0.1:${port}/health`, (res) => {
+        if (res.statusCode === 200) {
+          resolve()
+        } else {
+          scheduleNextCheck()
+        }
+      })
+
+      req.on('error', () => {
+        scheduleNextCheck()
+      })
+
+      req.setTimeout(1000, () => {
+        req.destroy()
+        scheduleNextCheck()
+      })
     }
 
-    const webDev = spawn('pnpm', ['dev'], {
-      cwd: webDir,
-      stdio: 'inherit',
-      shell: true
-    })
+    const scheduleNextCheck = () => {
+      if (Date.now() - startTime > timeout) {
+        reject(new Error(`等待端口 ${port} 超时`))
+      } else {
+        setTimeout(check, interval)
+      }
+    }
 
-    webDev.on('error', (error) => {
-      console.error('❌ 前端开发服务器启动失败:', error)
-      reject(error)
-    })
-
-    // 给前端服务器一些时间启动
-    setTimeout(() => {
-      console.log('✅ 前端开发服务器已启动')
-      resolve(webDev)
-    }, 3000)
-  })
-}
-
-/**
- * 启动 CLI 开发服务器
- */
-function startCliDev() {
-  return new Promise((resolve, reject) => {
-    console.log('\n🔧 启动 CLI 开发服务器...')
-    
-    const cliDev = spawn('tsx', ['src/index.ts', 'ui', '--debug'], {
-      cwd: projectRoot,
-      stdio: 'inherit',
-      shell: true
-    })
-
-    cliDev.on('error', (error) => {
-      console.error('❌ CLI 开发服务器启动失败:', error)
-      reject(error)
-    })
-
-    cliDev.on('close', (code) => {
-      console.log(`🔧 CLI 开发服务器已退出，退出码: ${code}`)
-    })
-
-    // 给 CLI 服务器一些时间启动
-    setTimeout(() => {
-      console.log('✅ CLI 开发服务器已启动')
-      resolve(cliDev)
-    }, 2000)
+    check()
   })
 }
 
@@ -86,118 +50,115 @@ function startCliDev() {
  * 主函数
  */
 async function main() {
+  console.log(chalk.blue.bold('\n🚀 启动 LDesign CLI 开发模式...\n'))
+
+  // 1. 启动后端服务器
+  console.log(chalk.cyan('📦 启动后端服务器 (端口 3000)...'))
+  const backend = spawn('tsx', ['watch', 'src/cli/index.ts', 'ui', '--no-open', '--debug'], {
+    cwd: process.cwd(),
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: true,
+  })
+
+  // 输出后端日志
+  backend.stdout.on('data', (data) => {
+    process.stdout.write(chalk.gray(`[Backend] ${data}`))
+  })
+
+  backend.stderr.on('data', (data) => {
+    process.stderr.write(chalk.yellow(`[Backend] ${data}`))
+  })
+
+  // 2. 等待后端就绪
   try {
-    // 检查依赖
-    console.log('\n🔍 检查依赖...')
-    
-    const checkDeps = spawn('pnpm', ['install'], {
-      cwd: projectRoot,
-      stdio: 'inherit',
-      shell: true
-    })
-
-    await new Promise((resolve, reject) => {
-      checkDeps.on('close', (code) => {
-        if (code === 0) {
-          console.log('✅ 依赖检查完成')
-          resolve(null)
-        } else {
-          reject(new Error(`依赖安装失败，退出码: ${code}`))
-        }
-      })
-    })
-
-    // 启动服务
-    const processes = []
-
-    // 启动前端开发服务器（如果存在）
-    try {
-      const webProcess = await startWebDev()
-      if (webProcess) {
-        processes.push(webProcess)
-      }
-    } catch (error) {
-      console.warn('⚠️  前端开发服务器启动失败，继续启动 CLI 服务器')
-    }
-
-    // 启动 CLI 开发服务器
-    const cliProcess = await startCliDev()
-    processes.push(cliProcess)
-
-    console.log('\n🎉 开发环境已启动！')
-    console.log('📝 使用说明:')
-    console.log('  - CLI 服务器: http://localhost:3000')
-    console.log('  - 前端开发服务器: http://localhost:3001 (如果启动)')
-    console.log('  - 按 Ctrl+C 停止所有服务')
-
-    // 处理进程退出
-    const cleanup = () => {
-      console.log('\n🛑 正在停止所有服务...')
-      processes.forEach(proc => {
-        if (proc && !proc.killed) {
-          try {
-            if (process.platform === 'win32') {
-              // Windows 下使用 taskkill 强制终止进程树
-              spawn('taskkill', ['/pid', proc.pid.toString(), '/f', '/t'], { shell: true })
-            } else {
-              // Unix/Linux 下发送 SIGTERM
-              proc.kill('SIGTERM')
-            }
-          } catch (error) {
-            console.error(`停止进程失败 (PID: ${proc.pid}):`, error.message)
-          }
-        }
-      })
-      
-      // 等待进程终止
-      setTimeout(() => {
-        console.log('✅ 所有服务已停止')
-        process.exit(0)
-      }, 1000)
-    }
-
-    // 处理各种终止信号
-    process.on('SIGINT', cleanup)
-    process.on('SIGTERM', cleanup)
-    process.on('SIGQUIT', cleanup)
-    
-    // Windows 特殊处理
-    if (process.platform === 'win32') {
-      process.on('SIGBREAK', cleanup)
-      
-      // 启用原始模式以正确捕获 Ctrl+C
-      if (process.stdin.isTTY) {
-        process.stdin.setRawMode(true)
-        process.stdin.on('data', (data) => {
-          // Ctrl+C 的字节码是 3
-          if (data[0] === 3) {
-            cleanup()
-          }
-        })
-      }
-    }
-
-    // 等待所有进程结束
-    await Promise.all(
-      processes.map(proc => 
-        new Promise(resolve => {
-          if (proc) {
-            proc.on('close', resolve)
-          } else {
-            resolve(null)
-          }
-        })
-      )
-    )
-
+    console.log(chalk.cyan('⏳ 等待后端服务器就绪...\n'))
+    await waitForPort(3000, 30000)
+    console.log(chalk.green('✅ 后端服务器已就绪!\n'))
   } catch (error) {
-    console.error('❌ 开发环境启动失败:', error)
+    console.error(chalk.red('❌ 后端服务器启动失败:', error.message))
+    backend.kill()
     process.exit(1)
   }
+
+  // 3. 启动前端开发服务器
+  console.log(chalk.magenta('🎨 启动前端开发服务器 (端口 5173)...\n'))
+  const frontend = spawn('npm', ['run', 'dev'], {
+    cwd: 'src/web',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    shell: true,
+  })
+
+  // 输出前端日志
+  frontend.stdout.on('data', (data) => {
+    process.stdout.write(chalk.gray(`[Frontend] ${data}`))
+  })
+
+  frontend.stderr.on('data', (data) => {
+    process.stderr.write(chalk.gray(`[Frontend] ${data}`))
+  })
+
+  // 4. 显示访问信息
+  setTimeout(() => {
+    console.log('')
+    console.log(chalk.green.bold('✨ 开发服务器已启动!\n'))
+    console.log(chalk.yellow.bold('📝 访问方式:'))
+    console.log(chalk.white('  🌐 前端页面: ') + chalk.cyan.bold.underline('http://localhost:5173') + chalk.green(' ← 访问这个'))
+    console.log(chalk.white('  🔌 后端API:  ') + chalk.cyan.underline('http://localhost:3000/api'))
+    console.log('')
+    console.log(chalk.yellow.bold('🔗 代理配置:'))
+    console.log(chalk.white('  - API 请求 /api → http://127.0.0.1:3000/api'))
+    console.log(chalk.white('  - WebSocket /ws → ws://127.0.0.1:3000/ws'))
+    console.log('')
+    console.log(chalk.gray('💡 提示:'))
+    console.log(chalk.gray('  • 访问前端页面查看 UI 界面'))
+    console.log(chalk.gray('  • API 和 WebSocket 会自动代理到后端'))
+    console.log(chalk.gray('  • 修改代码会自动热重载'))
+    console.log(chalk.gray('  • 按 Ctrl+C 停止所有服务器\n'))
+  }, 3000)
+
+  return { backend, frontend }
 }
 
-// 运行主函数
-main().catch(error => {
-  console.error('❌ 未处理的错误:', error)
+// 启动开发服务器
+const serversPromise = main().catch((error) => {
+  console.error(chalk.red('启动失败:', error))
   process.exit(1)
+})
+
+// 处理退出
+async function cleanup() {
+  console.log(chalk.yellow('\n\n正在关闭开发服务器...'))
+
+  const servers = await serversPromise
+  if (servers) {
+    servers.backend.kill()
+    servers.frontend.kill()
+  }
+
+  setTimeout(() => {
+    console.log(chalk.gray('👋 再见!\n'))
+    process.exit(0)
+  }, 500)
+}
+
+process.on('SIGINT', cleanup)
+process.on('SIGTERM', cleanup)
+
+// 监听服务器退出
+serversPromise.then((servers) => {
+  servers.backend.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(chalk.red('\n❌ 后端服务器异常退出'))
+      servers.frontend.kill()
+      process.exit(1)
+    }
+  })
+
+  servers.frontend.on('exit', (code) => {
+    if (code !== 0 && code !== null) {
+      console.error(chalk.red('\n❌ 前端服务器异常退出'))
+      servers.backend.kill()
+      process.exit(1)
+    }
+  })
 })

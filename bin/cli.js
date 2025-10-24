@@ -2,42 +2,32 @@
 
 /**
  * LDesign CLI 可执行文件
- * 支持 Node.js 18+ 和 ESM 模块
  */
 
-import { createRequire } from 'module'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 import { dirname, resolve } from 'path'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
-const require = createRequire(import.meta.url)
 
-// 动态导入 ES 模块
-;(async () => {
-  try {
-    // 检查 Node.js 版本
-    const nodeVersion = process.version
-    const majorVersion = Number.parseInt(nodeVersion.slice(1).split('.')[0])
+// 正确的相对路径
+const cliPath = resolve(__dirname, '../dist/cli/index.js')
+const cliUrl = pathToFileURL(cliPath).href
 
-    if (majorVersion < 18) {
-      console.error('❌ LDesign CLI requires Node.js 18 or higher')
-      console.error(`   Current version: ${nodeVersion}`)
-      process.exit(1)
+// ESM 加载器
+import(cliUrl)
+  .then((module) => {
+    const { main } = module
+    if (typeof main === 'function') {
+      return main()
     }
-
-    // 导入 CLI 模块
-    const cliPath = resolve(__dirname, '../dist/index.js')
-    const cliUrl = `file://${cliPath.replace(/\\/g, '/')}`
-    const { main } = await import(cliUrl)
-
-    // 运行 CLI
-    await main()
-  }
-  catch (error) {
-    console.error('❌ Failed to start LDesign CLI:')
-    console.error('   Please run "pnpm build" in the cli package first')
-    console.error(`   Error: ${error.message}`)
+    // 如果是 default export
+    if (module.default && typeof module.default === 'function') {
+      return module.default()
+    }
+  })
+  .catch((error) => {
+    console.error('CLI 启动失败:', error)
+    console.error('尝试加载:', cliPath)
     process.exit(1)
-  }
-})()
+  })
