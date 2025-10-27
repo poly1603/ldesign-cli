@@ -96,6 +96,8 @@ export async function createExpressServer(options: ServerOptions): Promise<Serve
   // 静态文件服务
   const possibleWebPaths = [
     resolve(__dirname, '../web'), // 打包后: dist/web (复制后的位置)
+    resolve(__dirname, '../../web-ui/dist'), // Monorepo: packages/web-ui/dist
+    resolve(__dirname, '../../../web-ui/dist'), // Monorepo 从 server/dist: packages/web-ui/dist
     resolve(__dirname, '../../src/web/dist'), // 开发模式: src/web/dist
   ]
 
