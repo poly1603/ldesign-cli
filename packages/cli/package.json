@@ -1,0 +1,35 @@
+{
+  "name": "@ldesign/cli",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CLI 命令行工具",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@ldesign/cli-server": "workspace:*",
+    "@ldesign/cli-shared": "workspace:*",
+    "cac": "^6.7.14",
+    "open": "^10.2.0",
+    "portfinder": "^1.0.38"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.7.3"
+  },
+  "bin": {
+    "ldesign": "./bin/cli.js",
+    "ld": "./bin/cli.js"
+  }
+}
