@@ -1,28 +1,28 @@
 {
-  "name": "@ldesign/cli-workspace",
+  "name": "@ldesign/cli",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
-  "description": "LDesign CLI 工具 - Monorepo 工作空间",
+  "description": "LDesign CLI 工具 - 集成所有工具包的统一命令行入口",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "ldesign": "./bin/cli.js",
+    "ld": "./bin/cli.js"
+  },
   "scripts": {
-    "build": "pnpm -r --filter='./packages/*' build",
-    "build:shared": "pnpm --filter @ldesign/cli-shared build",
-    "build:server": "pnpm --filter @ldesign/cli-server build",
-    "build:web-ui": "pnpm --filter @ldesign/cli-web-ui build",
-    "build:cli": "pnpm --filter @ldesign/cli build",
-    "dev": "pnpm --filter @ldesign/cli dev",
-    "dev:server": "pnpm --filter @ldesign/cli-server dev",
-    "dev:web": "pnpm --filter @ldesign/cli-web-ui dev",
-    "clean": "pnpm -r --parallel exec rimraf dist",
-    "test": "pnpm -r --filter='./packages/*' test",
-    "lint": "pnpm -r --filter='./packages/*' lint"
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rimraf dist",
+    "test": "vitest"
   },
   "keywords": [
     "ldesign",
     "cli",
     "scaffold",
-    "ui",
-    "vue",
+    "tools",
+    "build",
+    "deploy",
+    "generator",
     "typescript"
   ],
   "author": "LDesign Team",
@@ -31,12 +31,33 @@
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"
   },
+  "dependencies": {
+    "@ldesign/shared": "workspace:*",
+    "@ldesign/server": "workspace:*",
+    "@ldesign/web": "workspace:*",
+    "@ldesign/builder": "workspace:*",
+    "@ldesign/changelog": "workspace:*",
+    "@ldesign/deployer": "workspace:*",
+    "@ldesign/deps": "workspace:*",
+    "@ldesign/docs-generator": "workspace:*",
+    "@ldesign/formatter": "workspace:*",
+    "@ldesign/generator": "workspace:*",
+    "@ldesign/git": "workspace:*",
+    "@ldesign/kit": "workspace:*",
+    "@ldesign/launcher": "workspace:*",
+    "@ldesign/monitor": "workspace:*",
+    "@ldesign/performance": "workspace:*",
+    "@ldesign/publisher": "workspace:*",
+    "@ldesign/security": "workspace:*",
+    "@ldesign/testing": "workspace:*",
+    "@ldesign/translator": "workspace:*",
+    "cac": "^6.7.14",
+    "open": "^10.2.0",
+    "portfinder": "^1.0.38"
+  },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "prettier": "^3.1.0",
-    "rimraf": "^5.0.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.7.3",
-    "vitest": "^1.0.0"
+    "typescript": "^5.7.3"
   }
 }

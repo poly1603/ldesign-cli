@@ -1,13 +1,8 @@
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
-  // 入口文件 - 排除 web 目录
-  entry: [
-    'src/**/*.ts',
-    '!src/web/**/*',
-    '!src/**/*.test.ts',
-    '!src/**/*.spec.ts',
-  ],
+  // 入口文件
+  entry: ['src/index-simple.ts'],
 
   // 输出格式 - 使用 ESM
   format: ['esm'],
