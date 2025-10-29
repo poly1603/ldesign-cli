@@ -1,10 +1,10 @@
 /**
- * Dev 命令实现
- * 集成 @ldesign/launcher 包
+ * Dev command implementation
+ * Integrates @ldesign/launcher package
  */
 
 import type { CAC } from 'cac'
-import { logger } from '@ldesign/shared/utils.js'
+import { logger } from '@ldesign/shared'
 import type { CommandHandler } from '../CommandRegistry'
 
 export interface DevCommandOptions {
@@ -15,49 +15,50 @@ export interface DevCommandOptions {
 }
 
 /**
- * Dev 命令处理器
+ * Dev command handler
  */
 export async function devCommand(options: DevCommandOptions = {}): Promise<void> {
   const devLogger = logger.withPrefix('DEV')
   
   try {
-    devLogger.info('启动开发服务器...')
+    devLogger.info('Starting dev server...')
     
-    // TODO: 集成 @ldesign/launcher 包
+    // TODO: Integrate @ldesign/launcher package
     // import { startDevServer } from '@ldesign/launcher'
     // await startDevServer(options)
     
-    devLogger.warn('Dev 功能正在开发中...')
-    devLogger.info(`端口: ${options.port || 3000}`)
-    devLogger.info(`主机: ${options.host || 'localhost'}`)
-    if (options.open) devLogger.info('自动打开浏览器: 已启用')
-    if (options.https) devLogger.info('HTTPS: 已启用')
+    devLogger.warn('Dev functionality is under development...')
+    devLogger.info(`Port: ${options.port || 3000}`)
+    devLogger.info(`Host: ${options.host || 'localhost'}`)
+    if (options.open) devLogger.info('Auto open browser: enabled')
+    if (options.https) devLogger.info('HTTPS: enabled')
     
   } catch (error) {
-    devLogger.error('启动失败:', error)
+    devLogger.error('Dev server failed:', error)
     throw error
   }
 }
 
 /**
- * Dev 命令处理器 (CommandHandler 实现)
+ * Dev command handler (CommandHandler implementation)
  */
 export const devCommandHandler: CommandHandler = {
   name: 'dev',
-  description: '启动开发服务器',
+  description: 'Start dev server',
 
   setup(cli: CAC) {
     cli
-      .command('dev', '启动开发服务器')
-      .option('-p, --port <port>', '指定端口号', { type: [Number] })
-      .option('-H, --host <host>', '指定主机地址')
-      .option('--open', '自动打开浏览器')
-      .option('--https', '启用 HTTPS')
+      .command('dev', 'Start development server')
+      .alias('d')
+      .option('-p, --port <port>', 'Specify port', { type: [Number] })
+      .option('-H, --host <host>', 'Specify host')
+      .option('--open', 'Auto open browser')
+      .option('--https', 'Enable HTTPS')
       .action(async (options) => {
         try {
           await devCommand(options)
         } catch (error) {
-          logger.error('Dev 命令执行失败:', error)
+          logger.error('Dev command failed:', error)
           process.exit(1)
         }
       })

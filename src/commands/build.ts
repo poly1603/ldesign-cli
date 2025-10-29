@@ -1,10 +1,10 @@
 /**
- * Build 命令实现
- * 集成 @ldesign/builder 包
+ * Build command implementation
+ * Integrates @ldesign/builder package
  */
 
 import type { CAC } from 'cac'
-import { logger } from '@ldesign/shared/utils.js'
+import { logger } from '@ldesign/shared'
 import type { CommandHandler } from '../CommandRegistry'
 
 export interface BuildCommandOptions {
@@ -15,49 +15,50 @@ export interface BuildCommandOptions {
 }
 
 /**
- * Build 命令处理器
+ * Build command handler
  */
 export async function buildCommand(options: BuildCommandOptions = {}): Promise<void> {
   const buildLogger = logger.withPrefix('BUILD')
   
   try {
-    buildLogger.info('开始构建项目...')
+    buildLogger.info('Starting build...')
     
-    // TODO: 集成 @ldesign/builder 包
+    // TODO: Integrate @ldesign/builder package
     // import { build } from '@ldesign/builder'
     // await build(options)
     
-    buildLogger.warn('Build 功能正在开发中...')
-    buildLogger.info(`模式: ${options.mode || 'production'}`)
-    if (options.watch) buildLogger.info('监听模式: 已启用')
-    if (options.analyze) buildLogger.info('打包分析: 已启用')
-    if (options.sourcemap) buildLogger.info('源码映射: 已启用')
+    buildLogger.warn('Build functionality is under development...')
+    buildLogger.info(`Mode: ${options.mode || 'production'}`)
+    if (options.watch) buildLogger.info('Watch mode: enabled')
+    if (options.analyze) buildLogger.info('Bundle analysis: enabled')
+    if (options.sourcemap) buildLogger.info('Source map: enabled')
     
   } catch (error) {
-    buildLogger.error('构建失败:', error)
+    buildLogger.error('Build failed:', error)
     throw error
   }
 }
 
 /**
- * Build 命令处理器 (CommandHandler 实现)
+ * Build command handler (CommandHandler implementation)
  */
 export const buildCommandHandler: CommandHandler = {
   name: 'build',
-  description: '构建项目',
+  description: 'Build project',
 
   setup(cli: CAC) {
     cli
-      .command('build [entry]', '构建项目')
-      .option('--mode <mode>', '构建模式 (development/production)', { default: 'production' })
-      .option('--watch', '监听文件变化')
-      .option('--analyze', '启用打包分析')
-      .option('--sourcemap', '生成源码映射')
+      .command('build [entry]', 'Build project')
+      .alias('b')
+      .option('--mode <mode>', 'Build mode (development/production)', { default: 'production' })
+      .option('--watch', 'Watch file changes')
+      .option('--analyze', 'Enable bundle analysis')
+      .option('--sourcemap', 'Generate source maps')
       .action(async (entry, options) => {
         try {
           await buildCommand({ ...options, entry })
         } catch (error) {
-          logger.error('Build 命令执行失败:', error)
+          logger.error('Build command failed:', error)
           process.exit(1)
         }
       })

@@ -1,66 +1,59 @@
 /**
- * Generate 命令实现
- * 集成 @ldesign/generator 包
+ * Generate command implementation
+ * Integrates @ldesign/generator package
  */
 
 import type { CAC } from 'cac'
-import { logger } from '@ldesign/shared/utils.js'
+import { logger } from '@ldesign/shared'
 import type { CommandHandler } from '../CommandRegistry'
 
 export interface GenerateCommandOptions {
   type?: string
   name?: string
-  path?: string
   template?: string
 }
 
 /**
- * Generate 命令处理器
+ * Generate command handler
  */
 export async function generateCommand(options: GenerateCommandOptions = {}): Promise<void> {
-  const genLogger = logger.withPrefix('GEN')
+  const genLogger = logger.withPrefix('GENERATE')
   
   try {
-    genLogger.info('生成代码...')
+    genLogger.info('Generating code...')
     
-    // TODO: 集成 @ldesign/generator 包
+    // TODO: Integrate @ldesign/generator package
     // import { generate } from '@ldesign/generator'
     // await generate(options)
     
-    genLogger.warn('Generate 功能正在开发中...')
-    if (options.type) genLogger.info(`类型: ${options.type}`)
-    if (options.name) genLogger.info(`名称: ${options.name}`)
-    if (options.path) genLogger.info(`路径: ${options.path}`)
-    if (options.template) genLogger.info(`模板: ${options.template}`)
+    genLogger.warn('Generate functionality is under development...')
+    if (options.type) genLogger.info(`Type: ${options.type}`)
+    if (options.name) genLogger.info(`Name: ${options.name}`)
+    if (options.template) genLogger.info(`Template: ${options.template}`)
     
   } catch (error) {
-    genLogger.error('生成失败:', error)
+    genLogger.error('Generation failed:', error)
     throw error
   }
 }
 
 /**
- * Generate 命令处理器 (CommandHandler 实现)
+ * Generate command handler (CommandHandler implementation)
  */
 export const generateCommandHandler: CommandHandler = {
   name: 'generate',
-  description: '生成代码',
-  aliases: ['gen', 'g'],
+  description: 'Generate code',
 
   setup(cli: CAC) {
     cli
-      .command('generate <type> <name>', '生成代码')
-      .alias('gen')
+      .command('generate <type> <name>', 'Generate code from templates')
       .alias('g')
-      .option('--path <path>', '生成路径')
-      .option('--template <template>', '模板名称')
-      .example('  $ ldesign gen component Button')
-      .example('  $ ldesign gen page Dashboard --path src/pages')
+      .option('--template <template>', 'Template to use')
       .action(async (type, name, options) => {
         try {
           await generateCommand({ ...options, type, name })
         } catch (error) {
-          logger.error('Generate 命令执行失败:', error)
+          logger.error('Generate command failed:', error)
           process.exit(1)
         }
       })

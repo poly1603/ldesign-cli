@@ -1,140 +1,177 @@
-﻿/**
- * CLI 入口文件
+/**
+ * CLI Entry Point
+ * Unified entry file with all commands registered
  */
 
 import { cac } from 'cac'
 import { readFileSync } from 'fs'
 import { resolve, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { uiCommandHandler } from './commands/ui'
+import { logger } from '@ldesign/shared'
+import { getCommandRegistry } from './CommandRegistry'
+import type { LDesignConfig } from './types/config'
+
+// Import all command handlers
 import { buildCommandHandler } from './commands/build'
 import { devCommandHandler } from './commands/dev'
 import { deployCommandHandler } from './commands/deploy'
 import { testCommandHandler } from './commands/test'
 import { generateCommandHandler } from './commands/generate'
-import { logger } from '@ldesign/shared/utils.js'
-import { APP_NAME, APP_DISPLAY_NAME } from '@ldesign/shared/constants.js'
-import { getCommandRegistry } from './CommandRegistry'
-import { getConfigManager } from '@ldesign/server'
+import { uiCommandHandler } from './commands/ui'
+import { changelogCommandHandler } from './commands/changelog'
+import { formatterCommandHandler } from './commands/formatter'
+import { depsCommandHandler } from './commands/deps'
+import { gitCommandHandler } from './commands/git'
+import { monitorCommandHandler } from './commands/monitor'
+import { performanceCommandHandler } from './commands/performance'
+import { publisherCommandHandler } from './commands/publisher'
+import { securityCommandHandler } from './commands/security'
+import { docsCommandHandler } from './commands/docs'
+import { translatorCommandHandler } from './commands/translator'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 /**
- * 获取包版本号
+ * Get package version
  */
 function getVersion(): string {
   try {
-    const packagePath = resolve(__dirname, '../../package.json')
+    const packagePath = resolve(__dirname, '../package.json')
     const packageJson = JSON.parse(readFileSync(packagePath, 'utf-8'))
     return packageJson.version || '1.0.0'
   } catch (error) {
-    logger.warn('无法读取版本信息，使用默认版�?)
+    logger.warn('Cannot read version, using default')
     return '1.0.0'
   }
 }
 
 /**
- * 创建 CLI 应用
+ * Load user config from ldesign.config.ts/js
  */
-function createCLI() {
-  const cli = cac(APP_NAME)
+function loadUserConfig(): LDesignConfig {
+  try {
+    // TODO: Implement config file loading
+    // For now, return empty config
+    return {}
+  } catch (error) {
+    logger.debug('No config file found, using defaults')
+    return {}
+  }
+}
 
-  // 设置版本
+/**
+ * Apply global options
+ */
+function applyGlobalOptions(options: any, config: LDesignConfig): void {
+  if (options.debug) {
+    logger.setLevel('debug')
+  } else if (options.verbose) {
+    logger.setLevel('verbose')
+  } else if (options.silent) {
+    logger.setLevel('silent')
+  } else if (config.logLevel) {
+    logger.setLevel(config.logLevel)
+  }
+}
+
+/**
+ * Create CLI application
+ */
+function createCLI(config: LDesignConfig) {
+  const cli = cac('ldesign')
   cli.version(getVersion())
-
-  // 全局选项
+  
+  // Global options
   cli
-    .option('--debug', '启用调试模式')
-    .option('--silent', '静默模式')
-    .option('--verbose', '详细输出')
+    .option('--debug', 'Enable debug mode')
+    .option('--silent', 'Silent mode')
+    .option('--verbose', 'Verbose output')
 
-  // 注册命令
   const registry = getCommandRegistry()
-
-  // 注册 UI 命令
+  
+  // Register all commands
+  registry.register(buildCommandHandler)
+  registry.register(devCommandHandler)
+  registry.register(deployCommandHandler)
+  registry.register(testCommandHandler)
+  registry.register(generateCommandHandler)
   registry.register(uiCommandHandler)
+  registry.register(changelogCommandHandler)
+  registry.register(formatterCommandHandler)
+  registry.register(depsCommandHandler)
+  registry.register(gitCommandHandler)
+  registry.register(monitorCommandHandler)
+  registry.register(performanceCommandHandler)
+  registry.register(publisherCommandHandler)
+  registry.register(securityCommandHandler)
+  registry.register(docsCommandHandler)
+  registry.register(translatorCommandHandler)
 
-  // TODO: 注册其他命令
-  // registry.register(initCommandHandler)
-  // registry.register(createCommandHandler)
-  // registry.register(buildCommandHandler)
-  // registry.register(testCommandHandler)
-
-  // 设置所有命�?
   registry.setupCLI(cli)
-
-  // 帮助信息
   cli.help()
 
   return cli
 }
 
 /**
- * 显示欢迎信息
+ * Show welcome message
  */
 function showWelcome(): void {
   const version = getVersion()
-
   console.log('')
-  console.log('  ╭────────────────────────────────────�?)
-  console.log('  �?                                   �?)
-  console.log(`  �?    🎨 ${APP_DISPLAY_NAME} v${version.padEnd(14)}│`)
-  console.log('  �?                                   �?)
-  console.log('  �?    现代化的设计系统 CLI 工具      �?)
-  console.log('  �?                                   �?)
-  console.log('  ╰────────────────────────────────────�?)
+  console.log('  ╭─────────────────────────────────────╮')
+  console.log('  │                                     │')
+  console.log(`  │    🎨 LDesign CLI v${version.padEnd(14)}│`)
+  console.log('  │                                     │')
+  console.log('  │    Modern Design System CLI         │')
+  console.log('  │                                     │')
+  console.log('  ╰─────────────────────────────────────╯')
   console.log('')
 }
 
 /**
- * 主函�?
+ * Main function
  */
 export async function main(): Promise<void> {
   try {
-    // 加载配置
-    const configManager = getConfigManager()
-    configManager.loadConfig()
+    // Load user config
+    const config = loadUserConfig()
 
-    // 应用配置到日�?
-    const config = configManager.getConfig()
-    if (config.logLevel) {
-      logger.setLevel(config.logLevel)
-    }
+    // Create CLI
+    const cli = createCLI(config)
 
-    // 创建 CLI
-    const cli = createCLI()
-
-    // 如果没有参数，显示帮�?
+    // Show welcome if no arguments
     if (process.argv.length <= 2) {
       showWelcome()
       cli.help()
       return
     }
 
-    // 解析命令行参�?
-    cli.parse(process.argv)
+    // Parse before getting options
+    const parsed = cli.parse(process.argv, { run: false })
+    
+    // Apply global options
+    applyGlobalOptions(parsed.options, config)
+
+    // Run the command
+    await cli.runMatchedCommand()
   } catch (error) {
-    logger.error('CLI 启动失败:', error)
+    logger.error('CLI failed:', error)
     process.exit(1)
   }
 }
 
-// 默认导出（用于构建后的版本）
 export default main
 
-// 如果直接运行此文件，执行 main 函数
 const currentFile = fileURLToPath(import.meta.url)
 const isMainModule =
   process.argv[1] === currentFile ||
-  process.argv[1]?.endsWith('src/cli/index.ts') ||
-  process.argv[1]?.includes('tsx')
+  process.argv[1]?.includes('index')
 
 if (isMainModule) {
   main().catch((error) => {
-    logger.error('CLI 执行失败:', error)
+    logger.error('CLI execution failed:', error)
     process.exit(1)
   })
 }
-
-

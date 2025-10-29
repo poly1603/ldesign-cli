@@ -52,8 +52,10 @@
     "@ldesign/testing": "workspace:*",
     "@ldesign/translator": "workspace:*",
     "cac": "^6.7.14",
+    "execa": "^9.5.2",
     "open": "^10.2.0",
-    "portfinder": "^1.0.38"
+    "portfinder": "^1.0.38",
+    "wait-on": "^8.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

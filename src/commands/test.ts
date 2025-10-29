@@ -1,62 +1,60 @@
 /**
- * Test 命令实现
- * 集成 @ldesign/testing 包
+ * Test command implementation
+ * Integrates @ldesign/testing package
  */
 
 import type { CAC } from 'cac'
-import { logger } from '@ldesign/shared/utils.js'
+import { logger } from '@ldesign/shared'
 import type { CommandHandler } from '../CommandRegistry'
 
 export interface TestCommandOptions {
   watch?: boolean
   coverage?: boolean
-  updateSnapshot?: boolean
   pattern?: string
 }
 
 /**
- * Test 命令处理器
+ * Test command handler
  */
 export async function testCommand(options: TestCommandOptions = {}): Promise<void> {
   const testLogger = logger.withPrefix('TEST')
   
   try {
-    testLogger.info('运行测试...')
+    testLogger.info('Running tests...')
     
-    // TODO: 集成 @ldesign/testing 包
+    // TODO: Integrate @ldesign/testing package
     // import { runTests } from '@ldesign/testing'
     // await runTests(options)
     
-    testLogger.warn('Test 功能正在开发中...')
-    if (options.watch) testLogger.info('监听模式: 已启用')
-    if (options.coverage) testLogger.info('代码覆盖率: 已启用')
-    if (options.updateSnapshot) testLogger.info('更新快照: 已启用')
-    if (options.pattern) testLogger.info(`测试模式: ${options.pattern}`)
+    testLogger.warn('Test functionality is under development...')
+    if (options.watch) testLogger.info('Watch mode: enabled')
+    if (options.coverage) testLogger.info('Coverage: enabled')
+    if (options.pattern) testLogger.info(`Pattern: ${options.pattern}`)
     
   } catch (error) {
-    testLogger.error('测试失败:', error)
+    testLogger.error('Tests failed:', error)
     throw error
   }
 }
 
 /**
- * Test 命令处理器 (CommandHandler 实现)
+ * Test command handler (CommandHandler implementation)
  */
 export const testCommandHandler: CommandHandler = {
   name: 'test',
-  description: '运行测试',
+  description: 'Run tests',
 
   setup(cli: CAC) {
     cli
-      .command('test [pattern]', '运行测试')
-      .option('--watch', '监听模式')
-      .option('--coverage', '生成代码覆盖率报告')
-      .option('-u, --update-snapshot', '更新测试快照')
+      .command('test [pattern]', 'Run tests')
+      .alias('t')
+      .option('--watch', 'Watch mode')
+      .option('--coverage', 'Generate coverage report')
       .action(async (pattern, options) => {
         try {
           await testCommand({ ...options, pattern })
         } catch (error) {
-          logger.error('Test 命令执行失败:', error)
+          logger.error('Test command failed:', error)
           process.exit(1)
         }
       })
