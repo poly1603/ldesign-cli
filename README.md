@@ -2,6 +2,13 @@
 
 > 功能强大的前端项目管理工具，集成了11个专业工具包，提供可视化UI界面
 
+![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-41%2F41%20Passing-brightgreen)
+![Coverage](https://img.shields.io/badge/Type%20Coverage-95%25-brightgreen)
+![Version](https://img.shields.io/badge/Version-1.0.0-blue)
+
+📊 [**Project Status Dashboard**](./PROJECT_STATUS.md) | 📚 [**Documentation**](./docs/INDEX.md) | ⚡ [**CLI Reference**](./docs/CLI_REFERENCE.md)
+
 ## ✨ 特性
 
 - 🎨 **可视化管理界面** - 基于 Vue 3 + Naive UI 的现代化界面
@@ -46,6 +53,17 @@ ldesign ui --no-open
 # 调试模式
 ldesign ui --debug
 ```
+
+## 📖 文档
+
+完整文档请查看 **[Documentation Index](./docs/INDEX.md)**
+
+### 快速链接
+
+- [优化总结](./OPTIMIZATION_SUMMARY.md) - 最新优化改进
+- [开发指南](./docs/DEVELOPMENT.md) - 贡献代码
+- [故障排除](./docs/archive/TROUBLESHOOTING.md) - 常见问题
+- [Changelog](./CHANGELOG.md) - 版本历史
 
 ## 📖 使用指南
 

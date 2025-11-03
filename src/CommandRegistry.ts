@@ -1,118 +1,119 @@
 /**
- * 命令注册�?
- * 提供插件化的命令管理，方便扩展新命令
+ * Command Registry
+ * Provides plugin-based command management for easy extension
  */
 
 import type { CAC } from 'cac'
 import { logger } from '@ldesign/shared/utils.js'
+import type { CommandOptions } from './types/options'
 
 /**
- * 命令处理器接�?
+ * Command Handler Interface
  */
 export interface CommandHandler {
   /**
-   * 命令名称
+   * Command name
    */
   name: string
 
   /**
-   * 命令描述
+   * Command description
    */
   description: string
 
   /**
-   * 设置命令�?CLI
+   * Setup command to CLI
    */
   setup(cli: CAC): void
 
   /**
-   * 执行命令 (可选，setup时可能已经配置了action)
+   * Execute command (optional, may already be configured in setup)
    */
-  execute?(options: any): Promise<void>
+  execute?(options: CommandOptions): Promise<void>
 }
 
 /**
- * 命令注册�?
+ * Command Registry
  */
 export class CommandRegistry {
   private commands = new Map<string, CommandHandler>()
 
   /**
-   * 注册命令
+   * Register command
    */
   register(handler: CommandHandler): void {
     if (this.commands.has(handler.name)) {
-      logger.warn(`[CommandRegistry] 命令 "${handler.name}" 已存在，将被覆盖`)
+      logger.warn(`[CommandRegistry] Command "${handler.name}" already exists, will be overwritten`)
     }
 
     this.commands.set(handler.name, handler)
-    logger.debug(`[CommandRegistry] 已注册命�? ${handler.name}`)
+    logger.debug(`[CommandRegistry] Registered command: ${handler.name}`)
   }
 
   /**
-   * 注销命令
+   * Unregister command
    */
   unregister(name: string): boolean {
     const deleted = this.commands.delete(name)
     if (deleted) {
-      logger.debug(`[CommandRegistry] 已注销命令: ${name}`)
+      logger.debug(`[CommandRegistry] Unregistered command: ${name}`)
     }
     return deleted
   }
 
   /**
-   * 获取命令
+   * Get command
    */
   get(name: string): CommandHandler | undefined {
     return this.commands.get(name)
   }
 
   /**
-   * 获取所有命�?
+   * Get all commands
    */
   getAll(): CommandHandler[] {
     return Array.from(this.commands.values())
   }
 
   /**
-   * 检查命令是否存�?
+   * Check if command exists
    */
   has(name: string): boolean {
     return this.commands.has(name)
   }
 
   /**
-   * 设置所有命令到 CLI
+   * Setup all commands to CLI
    */
   setupCLI(cli: CAC): void {
-    logger.debug(`[CommandRegistry] 开始注�?${this.commands.size} 个命令`)
+    logger.debug(`[CommandRegistry] Starting to register ${this.commands.size} commands`)
 
     for (const [name, handler] of this.commands) {
       try {
         handler.setup(cli)
-        logger.debug(`[CommandRegistry] 命令 "${name}" 注册成功`)
+        logger.debug(`[CommandRegistry] Command "${name}" registered successfully`)
       } catch (error) {
-        logger.error(`[CommandRegistry] 命令 "${name}" 注册失败:`, error)
+        logger.error(`[CommandRegistry] Command "${name}" registration failed:`, error)
       }
     }
 
-    logger.debug(`[CommandRegistry] 所有命令注册完成`)
+    logger.debug(`[CommandRegistry] All commands registered`)
   }
 
   /**
-   * 清空所有命�?
+   * Clear all commands
    */
   clear(): void {
     this.commands.clear()
-    logger.debug('[CommandRegistry] 已清空所有命�?)
+    logger.debug('[CommandRegistry] Cleared all commands')
   }
 }
 
-// 单例
+// Singleton
 let instance: CommandRegistry | null = null
 
 /**
- * 获取命令注册器实�?
+ * Get command registry instance
  */
 export function getCommandRegistry(): CommandRegistry {
   if (!instance) {
@@ -120,5 +121,3 @@ export function getCommandRegistry(): CommandRegistry {
   }
   return instance
 }
-
-

@@ -6,12 +6,35 @@
 import type { CAC } from 'cac'
 import { logger } from '@ldesign/shared'
 import type { CommandHandler } from '../CommandRegistry'
+import type { CommandOptions } from '../types/options'
+import { CommandError } from '../utils/errors.js'
+import { validateEnum, validateFilePath, validateDirPath } from '../utils/command-helpers.js'
 
-export interface BuildCommandOptions {
+export interface BuildCommandOptions extends CommandOptions {
+  entry?: string
   mode?: 'development' | 'production'
   watch?: boolean
   analyze?: boolean
   sourcemap?: boolean
+  outDir?: string
+  minify?: boolean
+  clean?: boolean
+}
+
+/**
+ * Validate build options
+ */
+function validateBuildOptions(options: BuildCommandOptions): void {
+  // Validate mode
+  validateEnum(options.mode, ['development', 'production'], 'mode')
+
+  // Validate entry file if specified
+  if (options.entry) {
+    validateFilePath(options.entry, 'entry')
+  }
+
+  // Validate output directory
+  validateDirPath(options.outDir, 'outDir')
 }
 
 /**
@@ -23,19 +46,50 @@ export async function buildCommand(options: BuildCommandOptions = {}): Promise<v
   try {
     buildLogger.info('Starting build...')
     
-    // TODO: Integrate @ldesign/builder package
-    // import { build } from '@ldesign/builder'
-    // await build(options)
+    // Validate options
+    validateBuildOptions(options)
     
-    buildLogger.warn('Build functionality is under development...')
-    buildLogger.info(`Mode: ${options.mode || 'production'}`)
-    if (options.watch) buildLogger.info('Watch mode: enabled')
-    if (options.analyze) buildLogger.info('Bundle analysis: enabled')
-    if (options.sourcemap) buildLogger.info('Source map: enabled')
+    // Get configuration
+    const mode = options.mode || 'production'
+    const outDir = options.outDir || 'dist'
+    const cwd = options.cwd || process.cwd()
+    
+    buildLogger.info(`Mode: ${mode}`)
+    buildLogger.info(`Output directory: ${outDir}`)
+    if (options.entry) buildLogger.info(`Entry: ${options.entry}`)
+    
+    // Show enabled options
+    const features: string[] = []
+    if (options.watch) features.push('watch')
+    if (options.analyze) features.push('bundle analysis')
+    if (options.sourcemap) features.push('source maps')
+    if (options.minify) features.push('minification')
+    if (options.clean) features.push('clean output')
+    
+    if (features.length > 0) {
+      buildLogger.info(`Features: ${features.join(', ')}`)
+    }
+    
+    // TODO: Integrate @ldesign/builder package
+    // For now, show a helpful message
+    buildLogger.warn('🚧 Build functionality is under development')
+    buildLogger.info('\nTo integrate @ldesign/builder:')
+    buildLogger.info('  1. Ensure @ldesign/builder is installed')
+    buildLogger.info('  2. Import and call the build function')
+    buildLogger.info('  3. Pass validated options to the builder')
+    
+    // Simulate build success for demonstration
+    buildLogger.success('✅ Build configuration validated')
     
   } catch (error) {
-    buildLogger.error('Build failed:', error)
-    throw error
+    if (error instanceof ValidationError) {
+      throw error
+    }
+    throw new CommandError(
+      'Build failed',
+      'build',
+      { originalError: error }
+    )
   }
 }
 

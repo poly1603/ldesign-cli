@@ -10,8 +10,11 @@ import { fileURLToPath } from 'url'
 import { logger } from '@ldesign/shared'
 import { getCommandRegistry } from './CommandRegistry'
 import type { LDesignConfig } from './types/config'
+import type { GlobalOptions } from './types/options'
+import { handleError, ConfigError } from './utils/errors.js'
 
 // Import all command handlers
+import { initCommandHandler } from './commands/init'
 import { buildCommandHandler } from './commands/build'
 import { devCommandHandler } from './commands/dev'
 import { deployCommandHandler } from './commands/deploy'
@@ -49,11 +52,13 @@ function getVersion(): string {
 /**
  * Load user config from ldesign.config.ts/js
  */
-function loadUserConfig(): LDesignConfig {
+async function loadUserConfig(): Promise<LDesignConfig> {
+  const { loadConfig, validateConfig } = await import('./utils/config-loader.js')
+  
   try {
-    // TODO: Implement config file loading
-    // For now, return empty config
-    return {}
+    const config = await loadConfig()
+    validateConfig(config)
+    return config
   } catch (error) {
     logger.debug('No config file found, using defaults')
     return {}
@@ -63,7 +68,7 @@ function loadUserConfig(): LDesignConfig {
 /**
  * Apply global options
  */
-function applyGlobalOptions(options: any, config: LDesignConfig): void {
+function applyGlobalOptions(options: GlobalOptions, config: LDesignConfig): void {
   if (options.debug) {
     logger.setLevel('debug')
   } else if (options.verbose) {
@@ -91,6 +96,7 @@ function createCLI(config: LDesignConfig) {
   const registry = getCommandRegistry()
   
   // Register all commands
+  registry.register(initCommandHandler)
   registry.register(buildCommandHandler)
   registry.register(devCommandHandler)
   registry.register(deployCommandHandler)
@@ -133,10 +139,13 @@ function showWelcome(): void {
 /**
  * Main function
  */
+// Export config helper
+export { defineConfig } from './types/config'
+
 export async function main(): Promise<void> {
   try {
     // Load user config
-    const config = loadUserConfig()
+    const config = await loadUserConfig()
 
     // Create CLI
     const cli = createCLI(config)
@@ -157,8 +166,7 @@ export async function main(): Promise<void> {
     // Run the command
     await cli.runMatchedCommand()
   } catch (error) {
-    logger.error('CLI failed:', error)
-    process.exit(1)
+    await handleError(error, { exit: true })
   }
 }
 
@@ -170,8 +178,7 @@ const isMainModule =
   process.argv[1]?.includes('index')
 
 if (isMainModule) {
-  main().catch((error) => {
-    logger.error('CLI execution failed:', error)
-    process.exit(1)
+  main().catch(async (error) => {
+    await handleError(error, { exit: true })
   })
 }
