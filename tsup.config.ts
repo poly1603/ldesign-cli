@@ -2,7 +2,7 @@ import { defineConfig } from 'tsup'
 
 export default defineConfig({
   // 入口文件
-  entry: ['src/index-simple.ts'],
+  entry: ['src/index.ts'],
 
   // 输出格式 - 使用 ESM
   format: ['esm'],
@@ -68,6 +68,7 @@ export default defineConfig({
     '@ldesign/monitor',
     '@ldesign/security',
     '@ldesign/deps',
+    '@ldesign/shared',
   ],
 
   // 保持目录结构

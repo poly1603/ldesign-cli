@@ -32,26 +32,53 @@ pnpm add -g @ldesign/cli
 
 ### 启动 UI 界面
 
+**生产模式（默认）：**
 ```bash
 ldesign ui
 ```
+- 先构建 web 和 server，然后启动打包后的代码
+- 浏览器会自动打开 `http://localhost:3000/ui`
+- 使用打包后的优化代码，性能更好
 
-浏览器会自动打开 `http://localhost:3000`
+**Watch 模式（开发时推荐）：**
+```bash
+ldesign ui --watch
+# 或
+ldesign ui --dev
+```
+- 启用热更新，代码修改后自动重新编译/热重载
+- 后端：NestJS watch 模式，代码修改自动重启
+- 前端：Vite HMR，代码修改自动热更新
+- 浏览器会自动打开 `http://localhost:5173`（前端开发服务器）
 
 ### 命令行选项
 
 ```bash
+# 生产模式（默认）- 先构建再启动
+ldesign ui
+ldesign ui --prod
+
+# Watch 模式 - 启用热更新
+ldesign ui --watch
+ldesign ui --dev
+
 # 指定端口
-ldesign ui --port 8080
+ldesign ui --server-port 3000 --web-port 5173
 
 # 指定主机
 ldesign ui --host 0.0.0.0
 
+# 只启动 Server（不启动 Web）
+ldesign ui --server-only
+
+# 只启动 Web（不启动 Server）
+ldesign ui --web-only
+
+# 跳过构建步骤（生产模式）
+ldesign ui --no-build
+
 # 不自动打开浏览器
 ldesign ui --no-open
-
-# 调试模式
-ldesign ui --debug
 ```
 
 ## 📖 文档

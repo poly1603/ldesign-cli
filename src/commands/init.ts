@@ -6,7 +6,7 @@ import type { CAC } from 'cac'
 import { writeFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
 import { logger } from '@ldesign/shared'
-import type { CommandHandler } from '../CommandRegistry'
+import type { CommandHandler } from '../core/CommandRegistry'
 import type { CommandOptions } from '../types/options'
 import { FileSystemError } from '../utils/errors.js'
 
@@ -151,7 +151,7 @@ export async function initCommand(options: InitCommandOptions = {}): Promise<voi
     // Write config file
     writeFileSync(configPath, template, 'utf-8')
 
-    initLogger.success(`âœ… Created config file: ${configFileName}`)
+    initLogger.success(`âœ?Created config file: ${configFileName}`)
     initLogger.info('')
     initLogger.info('Next steps:')
     initLogger.info('  1. Edit the config file to customize settings')

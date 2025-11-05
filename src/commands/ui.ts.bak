@@ -1,0 +1,273 @@
+/**
+ * UI command: start server + web using dedicated launcher scripts
+ *
+ * 使用独立的启动脚本，支持开发和生产模式
+ */
+
+import type { CAC } from 'cac'
+import { existsSync } from 'fs'
+import open from 'open'
+import { logger } from '@ldesign/shared'
+import type { CommandHandler } from '../core/CommandRegistry'
+import { spawn, type ChildProcess } from 'child_process'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+import { execa } from 'execa'
+
+export interface UIOptions {
+  host?: string
+  open?: boolean
+  dev?: boolean
+  watch?: boolean // watch 模式（等同于 dev，启用热更新）
+  serverPort?: number
+  webPort?: number
+  serverOnly?: boolean
+  webOnly?: boolean
+  noBuild?: boolean
+}
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+// 从 dist/index.js 回到 tools 根目录
+// dist/index.js -> cli -> tools
+const CLI_ROOT = join(__dirname, '..')
+const TOOLS_ROOT = join(CLI_ROOT, '..')
+const SERVER_PATH = join(TOOLS_ROOT, 'server')
+const WEB_PATH = join(TOOLS_ROOT, 'web')
+const DEFAULT_SERVER_PORT = 3000
+const DEFAULT_WEB_PORT = 5173
+
+/**
+ * UI 命令主函�? * 使用可编程接口直接启动服�? */
+export async function uiCommand(options: UIOptions = {}): Promise<void> {
+  const uiLogger = logger.withPrefix('UI')
+  const host = options.host || '127.0.0.1'
+  const serverPort = options.serverPort || DEFAULT_SERVER_PORT
+  const webPort = options.webPort || DEFAULT_WEB_PORT
+  
+  // watch 等同于 dev
+  if (options.watch) {
+    options.dev = true
+  }
+  
+  // 默认使用生产模式（先构建再启动），除非明确指定 --dev 或 --watch
+  const isDev = options.dev === true || options.watch === true
+
+  let serverInstance: ServerInstance | null = null
+  let webInstance: WebUIInstance | null = null
+  let serverProcess: any = null // 用于 watch 模式的进程
+  // 默认同时启动 server 和 web，除非明确指定只启动一个
+  const shouldStartServer = !options.webOnly
+  const shouldStartWeb = !options.serverOnly
+
+  // 清理函数
+  const cleanup = async () => {
+    uiLogger.info('正在清理资源...')
+    try {
+      if (webInstance) {
+        await webInstance.stop().catch((err) => uiLogger.error('停止 Web 服务失败:', err))
+      }
+      if (serverProcess) {
+        try {
+          serverProcess.kill('SIGTERM')
+          await serverProcess.catch(() => {})
+        } catch (err) {
+          // 忽略清理错误
+        }
+      }
+      if (serverInstance) {
+        await serverInstance.stop().catch((err) => uiLogger.error('停止 Server 服务失败:', err))
+      }
+    } catch (err) {
+      uiLogger.error('清理资源时出错', err)
+    }
+  }
+
+  // 注册清理处理器
+  process.on('SIGINT', cleanup)
+  process.on('SIGTERM', cleanup)
+
+  try {
+    if (isDev) {
+      // ========== 开发模式（--watch）==========
+      // 同时启动 server 和 web 的开发服务器
+      uiLogger.info('🚀 启动开发模式（Watch 模式）...')
+      uiLogger.info('💡 代码修改会自动重新编译和热更新')
+
+      // 启动 Server 开发服务器（默认启动，除非指定 --web-only）
+      if (shouldStartServer) {
+        uiLogger.info('🛠️  启动后端 API 服务（开发模式）...')
+        serverInstance = await startDevServer({
+          port: serverPort,
+          host,
+          corsOrigins: [
+            `http://${host === '0.0.0.0' ? 'localhost' : host}:${webPort}`,
+            `http://localhost:${webPort}`,
+            `http://127.0.0.1:${webPort}`,
+          ],
+          enableWebSocket: true,
+          silent: false,
+        })
+        uiLogger.success(`✅ API 服务已启动: ${serverInstance.getUrl()}`)
+        uiLogger.info('💡 后端代码修改会自动重新编译和重启')
+      }
+
+      // 启动 Web 开发服务器（默认启动，除非指定 --server-only）
+      if (shouldStartWeb) {
+        uiLogger.info('🛠️  启动前端开发服务（热更新）...')
+        webInstance = await startDevUI({
+          port: webPort,
+          host,
+          open: false,
+          silent: false,
+        })
+        uiLogger.success(`✅ Web 服务已启动: ${webInstance.getUrl()}`)
+        uiLogger.info('💡 前端代码修改会自动热更新（HMR）')
+      }
+
+      uiLogger.success('🎉 开发模式启动完成！')
+      if (shouldStartServer && shouldStartWeb) {
+        uiLogger.info(`📍 API: ${serverInstance?.getUrl() || `http://${host === '0.0.0.0' ? 'localhost' : host}:${serverPort}`}`)
+        uiLogger.info(`📍 Web: ${webInstance?.getUrl() || `http://${host === '0.0.0.0' ? 'localhost' : host}:${webPort}`}`)
+      }
+      uiLogger.info('💡 按 Ctrl+C 停止所有服务')
+
+      // 打开浏览器（默认打开，除非指定 --no-open）
+      if (options.open !== false && webInstance) {
+        await open(webInstance.getUrl())
+      }
+
+    } else {
+      // ========== 生产模式 ==========
+      // 先构建，然后同时启动 server 和 web 的生产版本
+      uiLogger.info('🚀 启动生产模式...')
+
+      // 构建（如果需要）
+      if (!options.noBuild) {
+        uiLogger.info('📦 正在构建...')
+        
+        // 1. 构建 Web（前端应用）
+        if (shouldStartWeb) {
+          uiLogger.info('  📦 构建前端...')
+          await execa('pnpm', ['build'], {
+            cwd: WEB_PATH,
+            stdio: 'inherit',
+            shell: true,
+          })
+        }
+        
+        // 2. 构建 Server（后端服务）
+        if (shouldStartServer) {
+          uiLogger.info('  📦 构建后端...')
+          await execa('pnpm', ['build'], {
+            cwd: SERVER_PATH,
+            stdio: 'inherit',
+            shell: true,
+          })
+        }
+        
+        uiLogger.success('✅ 构建完成')
+      }
+
+      // 启动 Server 生产服务器（默认启动，除非指定 --web-only）
+      if (shouldStartServer) {
+        uiLogger.info('🛠️  启动后端服务...')
+        serverInstance = await startProdServer({
+          port: serverPort,
+          host,
+          corsOrigins: [
+            `http://${host === '0.0.0.0' ? 'localhost' : host}:${serverPort}`,
+            `http://localhost:${serverPort}`,
+            `http://127.0.0.1:${serverPort}`,
+            ...(shouldStartWeb ? [
+              `http://${host === '0.0.0.0' ? 'localhost' : host}:${webPort}`,
+              `http://localhost:${webPort}`,
+              `http://127.0.0.1:${webPort}`,
+            ] : []),
+          ],
+          enableWebSocket: true,
+          silent: false,
+        })
+        uiLogger.success(`✅ API 服务已启动: ${serverInstance.getUrl()}`)
+      }
+
+      // 启动 Web 生产服务器（默认启动，除非指定 --server-only）
+      if (shouldStartWeb) {
+        uiLogger.info('🛠️  启动前端服务...')
+        webInstance = await startProdUI({
+          port: webPort,
+          host,
+          open: false,
+          silent: false,
+        })
+        uiLogger.success(`✅ Web 服务已启动: ${webInstance.getUrl()}`)
+      }
+
+      uiLogger.success('🎉 生产模式启动完成！')
+      if (shouldStartServer && shouldStartWeb) {
+        uiLogger.info(`📍 API: ${serverInstance?.getUrl() || `http://${host === '0.0.0.0' ? 'localhost' : host}:${serverPort}`}`)
+        uiLogger.info(`📍 Web: ${webInstance?.getUrl() || `http://${host === '0.0.0.0' ? 'localhost' : host}:${webPort}`}`)
+      } else if (shouldStartServer) {
+        const uiUrl = `http://${host === '0.0.0.0' ? 'localhost' : host}:${serverPort}/ui`
+        uiLogger.info(`📍 Web UI: ${uiUrl}`)
+        uiLogger.info(`📍 API: ${serverInstance?.getUrl() || `http://${host === '0.0.0.0' ? 'localhost' : host}:${serverPort}/api`}`)
+      }
+      uiLogger.info('💡 按 Ctrl+C 停止服务')
+
+      // 打开浏览器（默认打开，除非指定 --no-open）
+      if (options.open !== false) {
+        if (webInstance) {
+          await open(webInstance.getUrl())
+        } else if (serverInstance) {
+          await open(`http://${host === '0.0.0.0' ? 'localhost' : host}:${serverPort}/ui`)
+        }
+      }
+    }
+
+    // 保持进程运行
+    await new Promise(() => {}) // 永久等待，直到收到信号
+  } catch (error) {
+    uiLogger.error('❌ UI 启动失败:', error)
+    await cleanup()
+    throw error
+  }
+}
+
+export const uiCommandHandler: CommandHandler = {
+  name: 'ui',
+  description: '启动可视化管理界面（默认同时启动 Server 和 Web）',
+  setup(cli: CAC) {
+    cli
+      .command('ui', '启动可视化管理界面（默认同时启动 Server 和 Web）')
+      .option('--host <host>', 'Host to bind', { default: '127.0.0.1' })
+      .option('--server-port <port>', 'Server port')
+      .option('--web-port <port>', 'Web port')
+      .option('--server-only', '只启动 Server（不启动 Web）')
+      .option('--web-only', '只启动 Web（不启动 Server）')
+      .option('--no-build', '跳过构建步骤（生产模式）')
+      .option('--dev', '开发模式（启用热更新，等同于 --watch）')
+      .option('--watch', 'Watch 模式（启用热更新，等同于 --dev）')
+      .option('--prod', '生产模式（默认，先构建再启动，使用打包后的代码）')
+      .option('--no-open', '不自动打开浏览器')
+      .action(async (options) => {
+        try {
+          // 如果指定了 --prod，则明确设置 dev 为 false
+          if (options.prod) {
+            options.dev = false
+            options.watch = false
+          }
+          // watch 和 dev 互斥
+          if (options.watch) {
+            options.dev = true
+          }
+          await uiCommand(options)
+        } catch (error) {
+          logger.error('UI command failed:', error)
+          process.exit(1)
+        }
+      })
+  },
+  async execute(options: UIOptions) {
+    return uiCommand(options)
+  },
+}

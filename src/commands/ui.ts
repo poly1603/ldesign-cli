@@ -1,201 +1,158 @@
-/**
- * UI command: start server + web with better UX & robustness
- *
- * 使用可编程接口直接启动服务，而不是通过 pnpm 命令
- */
-
-import type { CAC } from 'cac'
-import { existsSync } from 'fs'
 import open from 'open'
-import { logger } from '@ldesign/shared'
-import type { CommandHandler } from '../CommandRegistry'
-import { startDevServer, startProdServer, type ServerInstance } from '@ldesign/server'
-import { startDevUI, startProdUI, type WebUIInstance } from '@ldesign/web'
-import { execa } from 'execa'
-import { join } from 'path'
-import chalk from 'chalk'
+import { Logger } from '@ldesign/shared'
+import { spawn } from 'child_process'
+import path from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
+import type { CAC } from 'cac'
+import type { CommandHandler } from '../types/command'
 
-export interface UIOptions {
-  host?: string
+const logger = new Logger('UI')
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
+interface UIOptions {
+  port?: number
+  apiPort?: number
   open?: boolean
-  dev?: boolean
-  watch?: boolean // 新增：watch 模式（等同于 dev）
-  serverPort?: number
-  webPort?: number
-  serverOnly?: boolean
-  webOnly?: boolean
-  noBuild?: boolean
 }
 
-const TOOLS_ROOT = join(__dirname, '..', '..', '..')
-const SERVER_PATH = join(TOOLS_ROOT, 'server')
-const WEB_PATH = join(TOOLS_ROOT, 'web')
-const DEFAULT_SERVER_PORT = 3000
-const DEFAULT_WEB_PORT = 5173
-
 /**
- * UI 命令主函数
- * 使用可编程接口直接启动服务
+ * 启动 UI 服务（生产构建）
  */
-export async function uiCommand(options: UIOptions = {}): Promise<void> {
-  const uiLogger = logger.withPrefix('UI')
-  const host = options.host || '127.0.0.1'
-  const serverPort = options.serverPort || DEFAULT_SERVER_PORT
-  const webPort = options.webPort || DEFAULT_WEB_PORT
-  const isDev = !!options.dev
+async function startUI(options: UIOptions) {
+  const webPort = options.port || 5173
+  const apiPort = options.apiPort || 3000
+  const shouldOpen = options.open !== false
 
-  let serverInstance: ServerInstance | null = null
-  let webInstance: WebUIInstance | null = null
+  logger.info('🚀 启动 LDesign UI 服务...')
+  logger.info('💡 提示：开发阶段请手动启动 server 和 web 项目')
 
-  // 清理函数
-  const cleanup = async () => {
-    uiLogger.info('正在清理资源...')
-    if (webInstance) {
-      await webInstance.stop().catch((err) => uiLogger.error('停止 Web 服务失败:', err))
-    }
-    if (serverInstance) {
-      await serverInstance.stop().catch((err) => uiLogger.error('停止 Server 服务失败:', err))
-    }
+  const processes: any[] = []
+
+  // Cleanup function
+  const cleanup = () => {
+    logger.info('正在清理资源...')
+    processes.forEach((proc) => {
+      if (proc && !proc.killed) {
+        proc.kill('SIGTERM')
+      }
+    })
+    process.exit(0)
   }
 
-  // 注册清理处理器
   process.on('SIGINT', cleanup)
   process.on('SIGTERM', cleanup)
 
   try {
-    if (isDev) {
-      // ========== 开发模式 ==========
-      // 同时启动 server 和 web 的开发服务器
-      uiLogger.info('🚀 启动开发模式...')
-
-      // 启动服务器
-      if (!options.webOnly) {
-        uiLogger.info('🛠️  启动后端API服务...')
-        const webUrl = `http://${host === '0.0.0.0' ? 'localhost' : host}:${webPort}`
-        serverInstance = await startDevServer({
-          port: serverPort,
-          host,
-          corsOrigins: [
-            webUrl,
-            `http://localhost:${webPort}`,
-            `http://127.0.0.1:${webPort}`,
-          ],
-          enableWebSocket: true,
-          silent: false,
-        })
-        uiLogger.success(`✅ API: http://${host}:${serverPort}`)
-      }
-
-      // 启动前端
-      if (!options.serverOnly) {
-        uiLogger.info('🛠️  启动前端开发服务...')
-        webInstance = await startDevUI({
-          port: webPort,
-          host,
-          open: false,
-          silent: false,
-        })
-        uiLogger.success(`✅ Web: ${webInstance.getUrl()}`)
-
-        // 打开浏览器
-        if (options.open !== false) {
-          await open(webInstance.getUrl())
-        }
-      }
-
-      uiLogger.success('🎉 开发模式启动完成！')
-      uiLogger.info('💡 按 Ctrl+C 停止服务')
-
-    } else {
-      // ========== 生产模式 ==========
-      // 只启动 server，它会自动服务 web 的静态文件
-      uiLogger.info('🚀 启动生产模式...')
-
-      // 构建（如果需要）
-      if (!options.noBuild) {
-        uiLogger.info('📦 正在构建...')
-        
-        // 1. 构建 web（会自动同步到 server/public）
-        uiLogger.info('  → 构建前端...')
-        await execa('pnpm', ['build'], {
-          cwd: WEB_PATH,
-          stdio: 'inherit',
-          shell: true,
-        })
-        
-        // 2. 构建 server
-        uiLogger.info('  → 构建后端...')
-        await execa('pnpm', ['build'], {
-          cwd: SERVER_PATH,
-          stdio: 'inherit',
-          shell: true,
-        })
-        
-        uiLogger.success('✅ 构建完成')
-      }
-
-      // 启动 server（包含 web 静态文件服务）
-      uiLogger.info('🛠️  启动服务...')
-      serverInstance = await startProdServer({
-        port: serverPort,
-        host,
-        corsOrigins: [
-          `http://${host === '0.0.0.0' ? 'localhost' : host}:${serverPort}`,
-          `http://localhost:${serverPort}`,
-          `http://127.0.0.1:${serverPort}`,
-        ],
-        enableWebSocket: true,
-        silent: false,
-      })
-
-      const uiUrl = `http://${host === '0.0.0.0' ? 'localhost' : host}:${serverPort}/ui`
-      uiLogger.success(`✅ 服务启动完成`)
-      uiLogger.info(`📍 Web UI: ${uiUrl}`)
-      uiLogger.info(`📍 API: http://${host === '0.0.0.0' ? 'localhost' : host}:${serverPort}/api`)
-
-      // 打开浏览器
-      if (options.open !== false) {
-        await open(uiUrl)
-      }
-
-      uiLogger.success('🎉 生产模式启动完成！')
-      uiLogger.info('💡 按 Ctrl+C 停止服务')
+    // Calculate paths to bin scripts from node_modules or workspace
+    let serverBinPath: string
+    let webBinPath: string
+    
+    try {
+      // Try to resolve from node_modules (published scenario)
+      const { createRequire } = await import('module')
+      const require = createRequire(import.meta.url)
+      const serverMainPath = require.resolve('@ldesign/server')
+      const webMainPath = require.resolve('@ldesign/web')
+      
+      // Navigate from main module to bin directory
+      serverBinPath = path.resolve(path.dirname(serverMainPath), '../bin/start.mjs')
+      webBinPath = path.resolve(path.dirname(webMainPath), '../bin/start.mjs')
+    } catch {
+      // Fallback to workspace structure (development scenario)
+      const cliRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
+      serverBinPath = path.resolve(cliRoot, '../server/bin/start.mjs')
+      webBinPath = path.resolve(cliRoot, '../web/bin/start.mjs')
     }
 
-    // 保持进程运行
-    await new Promise(() => {}) // 永久等待，直到收到信号
+    // Start backend API service
+    logger.info('🛠️  启动后端 API 服务...')
+    const apiProcess = spawn('node', [serverBinPath, apiPort.toString()], {
+      stdio: 'inherit',
+      shell: true,
+      env: {
+        ...process.env,
+        PORT: apiPort.toString(),
+        NODE_ENV: 'production',
+      },
+    })
 
-  } catch (error) {
-    uiLogger.error('❌ UI 启动失败:', error)
-    await cleanup()
+    apiProcess.on('error', (error) => {
+      logger.error('API 服务启动失败:', error.message)
+      cleanup()
+    })
+
+    processes.push(apiProcess)
+
+    // Wait for API to start
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    logger.success('✅ API 服务已启动: http://0.0.0.0:' + apiPort)
+
+    // Start frontend preview server
+    logger.info('🛠️  启动前端服务...')
+    const webProcess = spawn('node', [webBinPath, webPort.toString()], {
+      stdio: 'inherit',
+      shell: true,
+      env: {
+        ...process.env,
+        PORT: webPort.toString(),
+      },
+    })
+
+    webProcess.on('error', (error) => {
+      logger.error('Web 服务启动失败:', error.message)
+      cleanup()
+    })
+
+    processes.push(webProcess)
+
+    // Wait for web server to start
+    await new Promise((resolve) => setTimeout(resolve, 3000))
+    logger.success('✅ Web 服务已启动: http://0.0.0.0:' + webPort)
+
+    logger.success('🎉 服务启动完成！')
+    logger.info(`📍 访问地址: http://localhost:${webPort}`)
+    logger.info(`📍 API 地址: http://localhost:${apiPort}`)
+    logger.info('💡 按 Ctrl+C 停止所有服务')
+
+    // Open browser if requested
+    if (shouldOpen) {
+      await open(`http://localhost:${webPort}`)
+    }
+
+    // Keep process alive
+    await new Promise(() => {})
+  } catch (error: any) {
+    logger.error('启动失败:', error.message)
+    cleanup()
     throw error
   }
 }
 
+/**
+ * UI 命令处理器
+ */
 export const uiCommandHandler: CommandHandler = {
   name: 'ui',
-  description: '启动可视化管理界面',
+  description: '启动 LDesign 可视化管理界面（生产构建）',
+
   setup(cli: CAC) {
     cli
-      .command('ui', '启动可视化管理界面')
-      .option('--host <host>', 'Host to bind')
-      .option('--server-port <port>', 'Server port', { type: [Number] })
-      .option('--web-port <port>', 'Web port', { type: [Number] })
-      .option('--server-only', 'Only start server')
-      .option('--web-only', 'Only start web')
-      .option('--no-build', 'Skip server build step')
-      .option('--dev', 'Run in dev mode')
-      .option('--no-open', 'Do not open browser')
-      .action(async (options) => {
+      .command('ui', '启动 LDesign 可视化管理界面（生产构建）')
+      .option('-p, --port <port>', '前端端口', { default: 5173 })
+      .option('-a, --api-port <port>', '后端 API 端口', { default: 3000 })
+      .option('--no-open', '不自动打开浏览器')
+      .action(async (options: UIOptions) => {
         try {
-          await uiCommand(options)
-        } catch (error) {
-          logger.error('UI command failed:', error)
+          await startUI(options)
+        } catch (error: any) {
+          logger.error('启动失败:', error.message)
           process.exit(1)
         }
       })
   },
-  async execute(options: UIOptions) {
-    return uiCommand(options)
-  },
+
+  execute: startUI,
 }

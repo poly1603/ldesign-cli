@@ -5,7 +5,7 @@
 
 import type { CAC } from 'cac'
 import { logger } from '@ldesign/shared'
-import type { CommandHandler } from '../CommandRegistry'
+import type { CommandHandler } from '../core/CommandRegistry'
 import type { CommandOptions } from '../types/options'
 import { CommandError } from '../utils/errors.js'
 import { validateEnum, validateFilePath, validateDirPath } from '../utils/command-helpers.js'
@@ -79,7 +79,7 @@ export async function buildCommand(options: BuildCommandOptions = {}): Promise<v
     buildLogger.info('  3. Pass validated options to the builder')
     
     // Simulate build success for demonstration
-    buildLogger.success('âœ… Build configuration validated')
+    buildLogger.success('âœ?Build configuration validated')
     
   } catch (error) {
     if (error instanceof ValidationError) {

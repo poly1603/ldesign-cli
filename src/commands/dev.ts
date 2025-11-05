@@ -5,7 +5,7 @@
 
 import type { CAC } from 'cac'
 import { logger } from '@ldesign/shared'
-import type { CommandHandler } from '../CommandRegistry'
+import type { CommandHandler } from '../core/CommandRegistry'
 import type { CommandOptions } from '../types/options'
 import { CommandError } from '../utils/errors.js'
 import { validatePort, validateHost, buildUrl } from '../utils/command-helpers.js'
@@ -71,7 +71,7 @@ export async function devCommand(options: DevCommandOptions = {}): Promise<void>
     devLogger.info(`\nExpected URL: ${url}`)
     
     // Simulate server start
-    devLogger.success('âœ… Dev server configuration validated')
+    devLogger.success('âœ?Dev server configuration validated')
     
   } catch (error) {
     if (error instanceof ValidationError) {

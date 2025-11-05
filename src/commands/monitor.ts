@@ -5,7 +5,7 @@
 
 import type { CAC } from 'cac'
 import { logger } from '@ldesign/shared'
-import type { CommandHandler } from '../CommandRegistry'
+import type { CommandHandler } from '../core/CommandRegistry'
 
 export interface MonitorCommandOptions {
   target?: string

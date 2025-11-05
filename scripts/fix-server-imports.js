@@ -7,7 +7,7 @@
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'fs'
 import { join } from 'path'
 
-const serverDir = join(process.cwd(), 'packages/server/src')
+const serverDir = join(process.cwd(), 'dist')
 
 console.log('🔧 修复 server 包导入路径...\n')
 

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { CommandRegistry, type CommandHandler } from '../CommandRegistry'
+import { CommandRegistry, type CommandHandler } from '../core/CommandRegistry'
 import type { CAC } from 'cac'
 
 describe('CommandRegistry', () => {
